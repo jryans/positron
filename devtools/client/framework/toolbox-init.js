@@ -39,6 +39,7 @@ if (url.search.length > 1) {
   // Specify the default tool to open
   let tool = url.searchParams.get("tool");
 
+  let toolboxOpened;
   if (url.searchParams.has("target")) {
     // Attach toolbox to a given browser iframe (<xul:browser> or <html:iframe
     // mozbrowser>) whose reference is set on the host iframe.
@@ -61,22 +62,32 @@ if (url.search.length > 1) {
         DebuggerServer.addBrowserActors();
       }
       let client = new DebuggerClient(DebuggerServer.connectPipe());
-      Task.spawn(function*() {
+      toolboxOpened = Task.spawn(function*() {
         yield client.connect();
         // Creates a target for a given browser iframe.
         let response = yield client.getTab({ tab });
         let form = response.tab;
         let target = yield TargetFactory.forRemoteTab({client, form, chrome: false});
         let options = { customIframe: host };
-        yield gDevTools.showToolbox(target, tool, Toolbox.HostType.CUSTOM, options);
+        return gDevTools.showToolbox(target, tool, Toolbox.HostType.CUSTOM, options);
       });
     }
   } else {
-    targetFromURL(url).then(target => {
+    toolboxOpened = Task.spawn(function*() {
+      let target = yield targetFromURL(url);
       let options = { customIframe: host };
       return gDevTools.showToolbox(target, tool, Toolbox.HostType.CUSTOM, options);
-    }).then(null, e => {
-      window.alert("Unable to start the toolbox:" + e.message);
+    }).catch(e => {
+      window.alert("Unable to start the toolbox: " + e.message);
     });
   }
+
+  // Ensure the toolbox gets destroyed if the host unloads
+  toolboxOpened.then(toolbox => {
+    let hostUnload = () => {
+      host.contentWindow.removeEventListener("unload", hostUnload);
+      toolbox.destroy();
+    };
+    host.contentWindow.addEventListener("unload", hostUnload);
+  });
 }
