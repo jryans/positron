@@ -4,6 +4,9 @@
 
 "use strict";
 
+const { classes: Cc, interfaces: Ci, results: Cr, utils: Cu } = Components;
+const { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
+
 let wrapWebContents = null;
 
 exports._setWrapWebContents = function(aWrapWebContents) {
@@ -29,6 +32,57 @@ let WebContents_prototype = {
   loadURL: function(url) {
     this._browserWindow._domWindow.location = url;
   },
+
+  openDevTools: function() {
+    // TODO: When tools can be opened inside the content window, support
+    // `detach` option to force into a new window instead.
+
+    // Ensure DevTools core modules are loaded, including support for the about
+    // URL below which is registered dynamically.
+    const { require } = Cu.import("resource://devtools/shared/Loader.jsm", {});
+    require("devtools/client/main");
+
+    // XXX: Consider switching to WindowHost.  The current approach below avoids
+    // the need for a container window wrapping a tools frame, but it does
+    // replicate close handling, etc.  For the moment, having a custom path here
+    // seems more flexible as we figure out exactly what we actually want.
+    let window = this._browserWindow._domWindow;
+    let id = window.QueryInterface(Ci.nsIInterfaceRequestor)
+                   .getInterface(Ci.nsIDOMWindowUtils)
+                   .outerWindowID;
+    let url = `about:devtools-toolbox?type=window&id=${id}`;
+    let features = "chrome,resizable,centerscreen," +
+                   "width=1024,height=768";
+    let toolsWindow = Services.ww.openWindow(null, url, null, features, null);
+
+    let onLoad = () => {
+      toolsWindow.removeEventListener("load", onLoad);
+      toolsWindow.addEventListener("unload", onUnload);
+      window.addEventListener("unload", onBrowserUnload);
+      this.emit("devtools-opened");
+    }
+    let onUnload = () => {
+      toolsWindow.removeEventListener("unload", onUnload);
+      toolsWindow.removeEventListener("message", onMessage);
+      window.removeEventListener("unload", onBrowserUnload);
+      this.emit("devtools-closed");
+    }
+    let onMessage = ({ data }) => {
+      data = JSON.parse(data);
+      if (data.name !== "toolbox-close") {
+        return;
+      }
+      toolsWindow.close();
+    };
+    // TODO: Improve browser window close handling.  DevTools is currently still
+    // attached when the window closes, leading to large errors.
+    let onBrowserUnload = () => {
+      toolsWindow.close();
+    };
+
+    toolsWindow.addEventListener("message", onMessage);
+    toolsWindow.addEventListener("load", onLoad);
+  },
 };
 
 function WebContents(options) {
@@ -40,6 +94,7 @@ function WebContents(options) {
   // it's an alias for getURL).
   this.getURL = this._getURL = WebContents_prototype.getURL;
   this.loadURL = WebContents_prototype.loadURL;
+  this.openDevTools = WebContents_prototype.openDevTools;
 }
 
 exports.create = function(options) {
