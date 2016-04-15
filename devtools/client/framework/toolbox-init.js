@@ -26,6 +26,16 @@ if (url.search.length > 1) {
                    .getInterface(Ci.nsIDOMWindowUtils)
                    .containerElement;
 
+  // If there's no containerElement, use the current window.
+  if (!host) {
+    host = {
+      contentWindow: window,
+      contentDocument: document,
+      setAttribute() {},
+      ownerDocument: document,
+    };
+  }
+
   // Specify the default tool to open
   let tool = url.searchParams.get("tool");
 
