@@ -67,6 +67,7 @@ windowWatcher.registerNotification(function observe(subject, topic, data) {
     case 'domwindowopened':
       break;
     case 'domwindowclosed': {
+      dump("WINDOW CLOSED\n")
       let browserWindow = browserWindows.get(subject);
       if (!browserWindow) {
         // The window might be a devtools window, in which case it won't be
@@ -74,6 +75,7 @@ windowWatcher.registerNotification(function observe(subject, topic, data) {
         // TODO: figure out if window-all-closed respects devtools windows,
         // in which case the conditional that determines whether or not to emit
         // that event will need to change.
+        dump("NOT BROWSER\n")
         return;
       }
 
@@ -88,6 +90,7 @@ windowWatcher.registerNotification(function observe(subject, topic, data) {
       // (depending on whether this module is reused to implement BrowserWindow
       // in those processes).
       if (browserWindows.size === 0) {
+        dump("ALL CLOSED\n")
         app.emit('window-all-closed');
       }
 
