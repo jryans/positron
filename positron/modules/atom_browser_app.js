@@ -11,7 +11,10 @@ Cu.import('resource://gre/modules/Services.jsm');
 exports.app = {
   quit() {
     // XXX Emit the before-quit and will-quit events.
-    Services.startup.quit(Services.startup.eAttemptQuit);
+	let timer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
+	timer.initWithCallback({ notify: function() {
+	    Services.startup.quit(Services.startup.eAttemptQuit);
+	} }, 0, Ci.nsITimer.TYPE_ONE_SHOT);
   },
 };
 
