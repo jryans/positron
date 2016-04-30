@@ -60,22 +60,15 @@ let WebContents_prototype = {
     let onLoad = () => {
       toolsWindow.removeEventListener("load", onLoad);
       toolsWindow.addEventListener("unload", onUnload);
-      window.addEventListener("unload", onBrowserUnload);
       this.emit("devtools-opened");
     }
     let onUnload = () => {
       toolsWindow.removeEventListener("unload", onUnload);
       toolsWindow.removeEventListener("message", onMessage);
-      window.removeEventListener("unload", onBrowserUnload);
       this.emit("devtools-closed");
     }
 
     // Close the DevTools window if the browser window closes
-    let onBrowserUnload = () => {
-      // XXX: If this unload handler is not present, the call to close the tools
-      // window in `onBrowserClosed` seems to not complete fast enough, blocking
-      // the quit process on Windows and Linux.
-    };
     let onBrowserClosed = () => {
       toolsWindow.close();
     };
